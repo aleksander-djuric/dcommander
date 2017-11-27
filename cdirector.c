@@ -14,7 +14,8 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <sys/stat.h>
-#include <copyfile.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <string.h>
 #include <ncurses.h>
 #include <locale.h>
@@ -103,8 +104,9 @@ int main() {
 	wrefresh(dirwin[0]);
 	wrefresh(dirwin[1]);
 	wrefresh(menu);
-	
-	getcwd(dirstate[0].path, MAX_STR-1);
+
+	if (getcwd(dirstate[0].path, MAX_STR-1) == NULL)
+		snprintf(dirstate[0].path, MAX_STR-1, "/");
 	snprintf(dirstate[1].path, MAX_STR-1, "/");
 
 	dirstate[0].count = scandir(dirstate[0].path, &(dirstate[0].items), dot_filter, alphasort);
@@ -117,7 +119,9 @@ int main() {
 
 	do {
 		struct stat st;
-		char *p;
+		char *s, *p;
+		pid_t pid;
+		int x, y, result;
 
 		cmd = getch();
 		switch (cmd) {
@@ -142,6 +146,8 @@ int main() {
 			mvwin(actwin2, LINES/2-6, COLS/2-POPUP_SIZE/2);
 			mvwin(errwin, LINES/2-5, COLS/2-POPUP_SIZE/2);
 
+			dirstate[0].choice = dirstate[0].start;
+			dirstate[1].choice = dirstate[1].start;
 			director(dirwin[active ^ 1], &dirstate[active ^ 1], 0, 0);
 
 			wrefresh(dirwin[0]);
@@ -170,7 +176,13 @@ int main() {
 				p = dirstate[active].items[dirstate[active].choice]->d_name;
 				snprintf(srcbuf, MAX_STR-1, "%s/%s", dirstate[active].path, p);
 				snprintf(dstbuf, MAX_STR-1, "%s/%s", dirstate[active ^ 1].path, p);
-				if (copyfile(srcbuf, dstbuf, NULL, COPYFILE_ALL|COPYFILE_RECURSIVE) < 0) {
+
+				result = 0;
+				if (!(pid = fork()))
+					return execl("/bin/cp", "cp", "-Rfp", srcbuf, dstbuf, (char *)0);
+				waitpid(pid, &result, 0);
+
+				if (result < 0) {
 					draw_errwin(errwin, "Couldn't copy file or directory", p);
 					wrefresh(errwin);
 					do { cmd = getch(); }
@@ -195,7 +207,13 @@ int main() {
 				p = dirstate[active].items[dirstate[active].choice]->d_name;
 				snprintf(srcbuf, MAX_STR-1, "%s/%s", dirstate[active].path, p);
 				snprintf(dstbuf, MAX_STR-1, "%s/%s", dirstate[active ^ 1].path, p);
-				if (rename(srcbuf, dstbuf) < 0) {
+
+				result = 0;
+				if (!(pid = fork()))
+					return execl("/bin/mv", "mv", "-f", srcbuf, dstbuf, (char *)0);
+				waitpid(pid, &result, 0);
+
+				if (result < 0) {
 					draw_errwin(errwin, "Couldn't move file or directory", p);
 					wrefresh(errwin);
 					do { cmd = getch(); }
@@ -216,13 +234,22 @@ int main() {
 			i = snprintf(dstbuf, MAX_STR-1, "%s/", dirstate[active].path);
 			wattron(actwin1, COLOR_PAIR(1));
 
-			for (p = dstbuf + i; p - dstbuf < MAX_STR; p++) {
+			s = p = dstbuf + i;
+			getyx(actwin1, y, x);
+			while (p - dstbuf < MAX_STR) {
 				cmd = getchar();
-				if (cmd != 13 && 27 != cmd) {
-					wprintw(actwin1, "%c", cmd);
-					*p = cmd;
+				if (cmd == 13 || 27 == cmd) break;
+				else if (cmd == KEY_BACKSPACE || cmd == 127) { // del
+					if (p == s) continue;
+					p--, x--;
+					mvwaddch(actwin1, y, x, ' ');
+					wmove(actwin1, y, x);
 					wrefresh(actwin1);
-				} else break;
+				} else {
+					wprintw(actwin1, "%c", cmd);
+					*p = cmd, x++, p++;
+					wrefresh(actwin1);
+				}
 			}
 			*p = '\0';
 
@@ -233,8 +260,10 @@ int main() {
 					wrefresh(errwin);
 					do { cmd = getch(); }
 						while (cmd < 7 && 128 > cmd); // press any key
-				} else
+				} else {
 					dirstate[active].count = scandir(dirstate[active].path, &(dirstate[active].items), dot_filter, alphasort);
+					dirstate[active ^ 1].count = scandir(dirstate[active ^ 1].path, &(dirstate[active ^ 1].items), dot_filter, alphasort);
+				}
 			}
 
 			director(dirwin[active ^ 1], &dirstate[active ^ 1], 0, 0);
@@ -249,13 +278,21 @@ int main() {
 				p = dirstate[active].items[dirstate[active].choice]->d_name;
 				snprintf(dstbuf, MAX_STR-1, "%s/%s", dirstate[active].path, p);
 
-				if (remove(dstbuf) == -1) {
+				result = 0;
+				if (!(pid = fork()))
+					return execl("/bin/rm", "rm", "-rf", dstbuf, (char *)0);
+				waitpid(pid, &result, 0);
+
+				if (result < 0) {
 					draw_errwin(errwin, "Couldn't delete file or directory", p);
 					wrefresh(errwin);
 					do { cmd = getch(); }
 						while (cmd < 7 && 128 > cmd); // press any key
-				} else
+				} else {
+					if (dirstate[active].choice > 0) dirstate[active].choice--;
 					dirstate[active].count = scandir(dirstate[active].path, &(dirstate[active].items), dot_filter, alphasort);
+					dirstate[active ^ 1].count = scandir(dirstate[active ^ 1].path, &(dirstate[active ^ 1].items), dot_filter, alphasort);
+				}
 			}
 
 			director(dirwin[active ^ 1], &dirstate[active ^ 1], 0, 0);
@@ -278,7 +315,7 @@ int main() {
 
 			if (S_ISDIR(st.st_mode) && chdir(dstbuf) == 0) {
 				if (lstat(dstbuf, &st) < 0) break;
-				getcwd(dirstate[active].path, MAX_STR-1);
+				if (getcwd(dirstate[active].path, MAX_STR-1) == NULL) break;
 				dirstate[active].count = scandir(dirstate[active].path, &(dirstate[active].items), dot_filter, alphasort);
 				if (*p == '.' && *(p + 1) == '.') {
 					dirstate[active].choice = dirstate[active].prev;
@@ -456,7 +493,7 @@ int wprintw_m(WINDOW *win, int attrs, char *path, char *name, int maxlen) {
 }
 
 void director(WINDOW *dir, wstate *s, int cmd, int active) {
-	char path[MAX_STR];
+	char path[2*MAX_STR];
 	int i, y, cur, len, lines;
 
 	cur = s->choice - s->start;
@@ -470,8 +507,8 @@ void director(WINDOW *dir, wstate *s, int cmd, int active) {
 	for (i = s->start, y = 1; i < (s->start + lines); i++, y++) {
 		if (i < (s->start + len)) {
 			wmove(dir, y, 1);
-			wclrtoeol(dir);			
-			snprintf(path, MAX_STR-1, "%s/%s", s->path, s->items[i]->d_name);
+			wclrtoeol(dir);
+			snprintf(path, 2*MAX_STR-1, "%s/%s", s->path, s->items[i]->d_name);
 
 			if (s->start + cur == i && active)
 				wprintw_m(dir, A_REVERSE, path, s->items[i]->d_name, s->width - 1);
@@ -515,9 +552,15 @@ void director(WINDOW *dir, wstate *s, int cmd, int active) {
 			s->start += lines;
 			i -= lines;
 			if (i < lines) cur = 0;
-		} else {
-			cur = i - 1;
-		}
+		} else cur = i - 1;
+		break;
+	case KEY_HOME:
+		cur = s->start;
+		break;
+	case KEY_END:
+		i = s->count - s->start;
+		if (i > lines) cur = lines - 1;
+		else cur = i - 1;
 		break;
 	default:
 		break;
