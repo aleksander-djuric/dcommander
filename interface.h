@@ -1,5 +1,5 @@
 /*
- * winds.h
+ * interface.h
  *
  * Description: Daily Commander File Manager
  * Copyright (c) 2017 Aleksander Djuric. All rights reserved.
@@ -9,8 +9,8 @@
  *
  */
 
-#ifndef _WINDS_H
-#define _WINDS_H
+#ifndef _INTERFACE_H
+#define _INTERFACE_H
 
 void ncstart();
 void draw_help(WINDOW *help);
@@ -19,6 +19,6 @@ void draw_actwin2(WINDOW *actwin, char *caption, char *src, char *dst);
 void draw_errwin(WINDOW *errwin, char *caption, char *desc);
 void draw_menubar(WINDOW *menu, int size);
 void draw_statbar(WINDOW *status, const char *fmt, ...);
-int draw_shell(WINDOW *sshell, char *path, char *command);
+int draw_shell(WINDOW *sshell, char *path, char *name);
 
-#endif // _WINDS_H
+#endif // _INTERFACE_H

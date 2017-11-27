@@ -11,7 +11,7 @@
 
 #include "commander.h"
 
-int wprintw_m(WINDOW *win, int attrs, char *path, char *name, int maxlen) {
+int wprintw_m(WINDOW *win, int attrs, char *path, char *name) {
 	struct stat st, lst;
 	int ret;
 
@@ -26,7 +26,7 @@ int wprintw_m(WINDOW *win, int attrs, char *path, char *name, int maxlen) {
 	else if	(S_ISLNK(lst.st_mode)) wprintw(win, "@");
 	else if (st.st_mode & S_IXUSR) wprintw(win, "*");
 
-	ret = wprintw(win, "%.*s", maxlen, name);
+	ret = wprintw(win, "%s", name);
 	if (attrs) wattroff(win, attrs);
 
 	return ret;
@@ -51,8 +51,8 @@ void browser(WINDOW *dir, wstate *s, int cmd, int active) {
 			snprintf(path, 2*MAX_STR-1, "%s/%s", s->path, s->items[i]->d_name);
 
 			if (s->start + cur == i && active)
-				wprintw_m(dir, A_REVERSE, path, s->items[i]->d_name, s->width - 1);
-			else wprintw_m(dir, 0, path, s->items[i]->d_name, s->width - 1);
+				wprintw_m(dir, A_REVERSE, path, s->items[i]->d_name);
+			else wprintw_m(dir, 0, path, s->items[i]->d_name);
 		} else {
 			wmove(dir, y, 1);
 			wclrtoeol(dir);

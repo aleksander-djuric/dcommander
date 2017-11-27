@@ -9,7 +9,7 @@
  *
  */
 #include "commander.h"
-#include "winds.h"
+#include "interface.h"
 #include "browser.h"
 
 int dot_filter(const struct dirent *ent) {

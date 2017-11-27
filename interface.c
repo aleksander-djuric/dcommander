@@ -1,5 +1,5 @@
 /*
- * winds.c
+ * interface.c
  *
  * Description: Daily Commander File Manager
  * Copyright (c) 2017 Aleksander Djuric. All rights reserved.
@@ -126,14 +126,14 @@ void draw_statbar(WINDOW *status, const char *fmt, ...) {
 	va_end(args);
 }
 
-int draw_shell(WINDOW *shell, char *path, char *command) {
+int draw_shell(WINDOW *shell, char *path, char *name) {
 	int fd[2];
 	pid_t pid;
 	char buffer[32768];
 	int rc, size;
 
 	wbkgd(shell, COLOR_PAIR(3));
-	wprintw(shell, ">%s\n", command);
+	wprintw(shell, ">%s\n", name);
 	keypad(shell, true);
 	scrollok(shell, true);
 
@@ -143,7 +143,7 @@ int draw_shell(WINDOW *shell, char *path, char *command) {
 		dup2(fd[1], STDOUT_FILENO);
 		close(fd[0]);
 		close(fd[1]);
-		return execl(path, command, (char *)0);
+		return execl(path, name, (char *)0);
 	}
 
 	rc = 0;
