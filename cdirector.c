@@ -42,13 +42,13 @@ void draw_actwin2(WINDOW *actwin, char *caption, char *src, char *dst);
 void draw_errwin(WINDOW *errwin, char *caption, char *desc);
 void draw_menubar(WINDOW *menu, int size);
 void draw_statbar(WINDOW *status, const char *fmt, ...);
-void draw_subshell(WINDOW *sshell, char *path, char *command);
+int draw_shell(WINDOW *sshell, char *path, char *command);
 int dot_filter(const struct dirent *ent);
 int wprintw_m(WINDOW *win, int attrs, char *path, char *name, int maxlen);
 void director(WINDOW *dir, wstate *state, int cmd, int active);
 
 int main() {
-	WINDOW **dirwin, *status, *menu, *help;
+	WINDOW **dirwin, *status, *menu, *help, *shell;
 	WINDOW *actwin1, *actwin2, *errwin;
 	char srcbuf[MAX_STR];
 	char dstbuf[MAX_STR];
@@ -99,6 +99,9 @@ int main() {
 	// Error window
 	errwin = newwin(8, POPUP_SIZE, LINES/2-5, COLS/2-POPUP_SIZE/2);
 
+	// Subshell window
+	shell = newwin(LINES-2, COLS, 1, 0);
+
 	refresh();
 	wrefresh(status);
 	wrefresh(dirwin[0]);
@@ -139,6 +142,7 @@ int main() {
 
 			wresize(dirwin[0], dirstate[0].height, dirstate[0].width);
 			wresize(dirwin[1], dirstate[1].height, dirstate[1].width);
+			wresize(shell, LINES-2, COLS);
 
 			mvwin(dirwin[1], 1, COLS/2 - 1);
 			mvwin(help, LINES/2-7, COLS/2-POPUP_SIZE/2);
@@ -327,7 +331,14 @@ int main() {
 					dirstate[active].prev = dirstate[active].choice;
 					dirstate[active].choice = 0;
 				}
-			} else if (st.st_mode & S_IXUSR) { // todo: execute file in subshell
+			} else if (st.st_mode & S_IXUSR) {
+				if (draw_shell(shell, dstbuf, p) < 0) {
+					draw_errwin(errwin, "Couldn't exec", p);
+					wrefresh(errwin);
+				} else 	wrefresh(shell);
+
+				do { cmd = getch(); }
+					while (cmd < 7 && 128 > cmd); // press any key
 				break;
 			}
 
@@ -465,6 +476,38 @@ void draw_statbar(WINDOW *status, const char *fmt, ...) {
 	vwprintw(status, fmt, args);
 
 	va_end(args);
+}
+
+int draw_shell(WINDOW *shell, char *path, char *command) {
+	int fd[2];
+	pid_t pid;
+	char buffer[32768];
+	int rc, size;
+
+	wbkgd(shell, COLOR_PAIR(3));
+	wprintw(shell, ">%s\n", command);
+	keypad(shell, true);
+	scrollok(shell, true);
+
+	if (pipe(fd) < 0) return -1;
+
+	if (!(pid = fork())) {
+		dup2(fd[1], STDOUT_FILENO);
+		close(fd[0]);
+		close(fd[1]);
+		return execl(path, command, (char *)0);
+	}
+
+	rc = 0;
+	waitpid(pid, &rc, 0);
+	if (rc < 0) return -1;
+
+	close(fd[1]);
+
+	if ((size = read(fd[0], buffer, sizeof(buffer))))
+		wprintw(shell, "%.*s\n", size, buffer);
+
+	return 0;
 }
 
 int dot_filter(const struct dirent *ent) {
