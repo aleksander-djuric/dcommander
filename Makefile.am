@@ -1,4 +1,4 @@
-bin_PROGRAMS = cdirector
-cdirector_SOURCES = cdirector.c
-cdirector_CFLAGS = -Wall -O2
-cdirector_LDFLAGS = -lncursesw
+bin_PROGRAMS = dcom
+dcom_SOURCES = commander.c browser.c winds.c
+dcom_CFLAGS = -Wall -O2
+dcom_LDFLAGS = -lncursesw

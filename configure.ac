@@ -1,6 +1,6 @@
-AC_INIT([cdirector], [1.0])
+AC_INIT([dcom], [1.0])
 AM_INIT_AUTOMAKE([foreign])
-AC_CONFIG_SRCDIR([cdirector.c])
+AC_CONFIG_SRCDIR([commander.c])
 AC_CONFIG_HEADERS([config.h])
 
 # Checks for programs.
