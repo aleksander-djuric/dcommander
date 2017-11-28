@@ -39,7 +39,9 @@ void ncstart() {
 //	curs_set(0);
 }
 
-void draw_help(WINDOW *win) {
+int draw_help(WINDOW *win) {
+	int rc = 0;
+
 	wbkgd(win, COLOR_PAIR(2));
 	box(win, 0, 0);
 
@@ -52,9 +54,14 @@ void draw_help(WINDOW *win) {
 	mvwprintw(win, 7, 2, "This is free software, and you are welcome to");
 	mvwprintw(win, 8, 2, "redistribute it under terms of GNU General Public");
 	mvwprintw(win, 9, 2, "License. Press any key to continue..");
+
+	do { rc = getch(); }
+		while (rc < 7 && 128 > rc); // press any key
+		
+	return rc;
 }
 
-void draw_actwin1(WINDOW *win, char *caption, char *dst) {
+void draw_pmtwin(WINDOW *win, char *caption, char *dst) {
 	wbkgd(win, COLOR_PAIR(2));
 	box(win, 0, 0);
 	mvwhline(win, 1, 2, ' ', 50);
@@ -66,9 +73,34 @@ void draw_actwin1(WINDOW *win, char *caption, char *dst) {
 	mvwhline(win, 4, 2, ' ', 50);
 	mvwprintw(win, 4, 2, "%.50s", dst);
 	wattroff(win, COLOR_PAIR(2));
+	wrefresh(win);
 }
 
-void draw_actwin2(WINDOW *win, char *caption, char *src, char *dst) {
+int draw_actwin1(WINDOW *win, char *caption, char *dst) {
+	int rc = 0;
+
+	wbkgd(win, COLOR_PAIR(2));
+	box(win, 0, 0);
+	mvwhline(win, 1, 2, ' ', 50);
+	mvwprintw(win, 1, POPUP_SIZE/2-strlen(caption)/2, "%s", caption);
+	mvwhline(win, 2, 1, 0, 52);
+	mvwhline(win, 6, 2, ' ', 50);
+	mvwprintw(win, 6, POPUP_SIZE/2-18, "Press Enter to confirm, Esc to exit.");
+	wattron(win, COLOR_PAIR(1));
+	mvwhline(win, 4, 2, ' ', 50);
+	mvwprintw(win, 4, 2, "%.50s", dst);
+	wattroff(win, COLOR_PAIR(2));
+	wrefresh(win);
+
+	do { rc = getch(); }
+		while (rc != 10 && 27 != rc); // enter or esc
+		
+	return rc;
+}
+
+int draw_actwin2(WINDOW *win, char *caption, char *src, char *dst) {
+	int rc = 0;
+
 	wbkgd(win, COLOR_PAIR(2));
 	box(win, 0, 0);
 	mvwhline(win, 1, 2, ' ', 50);
@@ -85,9 +117,17 @@ void draw_actwin2(WINDOW *win, char *caption, char *src, char *dst) {
 	mvwhline(win, 6, 2, ' ', 50);
 	mvwprintw(win, 6, 2, "%.50s", dst);
 	wattroff(win, COLOR_PAIR(2));
+	wrefresh(win);
+
+	do { rc = getch(); }
+		while (rc != 10 && 27 != rc); // enter or esc
+		
+	return rc;
 }
 
-void draw_errwin(WINDOW *win, char *caption, char *desc) {
+int draw_errwin(WINDOW *win, char *caption, char *desc) {
+	int rc = 0;
+
 	wbkgd(win, COLOR_PAIR(4));
 	box(win, 0, 0);
 	mvwhline(win, 1, 2, ' ', 50);
@@ -99,6 +139,12 @@ void draw_errwin(WINDOW *win, char *caption, char *desc) {
 	mvwhline(win, 4, 2, ' ', 50);
 	mvwprintw(win, 4, 2, "%.50s", desc);
 	wattroff(win, COLOR_PAIR(4));
+	wrefresh(win);
+
+	do { rc = getch(); }
+		while (rc < 7 && 128 > rc); // press any key
+		
+	return rc;
 }
 
 void draw_menubar(WINDOW *win, int size) {
@@ -179,6 +225,10 @@ int draw_execwin(WINDOW *win, char *path, int argc, ...) {
 	while ((size = read(fd[0], buffer, sizeof(buffer))))
 		waddnstr(win, buffer, size);
 	waddch(win, '\n');
+
+	wrefresh(win);
+	do { rc = getch(); }
+		while (rc < 7 && 128 > rc); // press any key
 
 	return 0;
 }

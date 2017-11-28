@@ -13,10 +13,11 @@
 #define _INTERFACE_H
 
 void ncstart();
-void draw_help(WINDOW *win);
-void draw_actwin1(WINDOW *win, char *caption, char *dst);
-void draw_actwin2(WINDOW *win, char *caption, char *src, char *dst);
-void draw_errwin(WINDOW *win, char *caption, char *desc);
+int draw_help(WINDOW *win);
+int draw_actwin1(WINDOW *win, char *caption, char *dst);
+int draw_actwin2(WINDOW *win, char *caption, char *src, char *dst);
+int draw_errwin(WINDOW *win, char *caption, char *desc);
+void draw_pmtwin(WINDOW *win, char *caption, char *dst);
 void draw_menubar(WINDOW *win, int size);
 void draw_statbar(WINDOW *win, const char *fmt, ...);
 int draw_execwin(WINDOW *win, char *path, int argc, ...);

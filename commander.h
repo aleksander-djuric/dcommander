@@ -28,6 +28,7 @@
 #define MENU_ITEMS 10
 #define POPUP_SIZE 54
 #define MAX_STR 1024
+#define LOG_SIZE 32768
 #define EXEC_MAXARGS 10
 
 typedef struct {

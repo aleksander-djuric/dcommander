@@ -17,8 +17,8 @@ int dot_filter(const struct dirent *ent) {
 }
 
 int main() {
-	WINDOW **dirwin, *status, *menu, *help, *execw;
-	WINDOW *actwin1, *actwin2, *errwin;
+	WINDOW **dirwin, *actwin1, *actwin2, *errwin;
+	WINDOW *status, *menu, *help, *execw;
 	char srcbuf[MAX_STR];
 	char dstbuf[MAX_STR];
 	wstate dirstate[2];
@@ -93,8 +93,7 @@ int main() {
 	do {
 		struct stat st;
 		char *s, *p;
-		pid_t pid;
-		int x, y, result;
+		int x, y;
 
 		cmd = getch();
 		switch (cmd) {
@@ -134,35 +133,18 @@ int main() {
 			break;
 		case KEY_F(1):
 			draw_help(help);
-			wrefresh(help);
-			do { cmd = getch(); }
-				while (cmd < 7 && 128 > cmd); // press any key
 			updtflag = true;
 			break;
 		case KEY_F(5):
-			draw_actwin2(actwin2, "Copy", dirstate[active].items[dirstate[active].choice]->d_name,
-				dirstate[active ^ 1].path);
-			wrefresh(actwin2);
-			do { cmd = getch(); }
-				while (cmd != 10 && 27 != cmd); // enter or esc
+			cmd = draw_actwin2(actwin2, "Copy", dirstate[active].items[dirstate[active].choice]->d_name, dirstate[active ^ 1].path);
 
 			if (cmd != 27) {
 				p = dirstate[active].items[dirstate[active].choice]->d_name;
 				snprintf(srcbuf, MAX_STR-1, "%s/%s", dirstate[active].path, p);
 				snprintf(dstbuf, MAX_STR-1, "%s/%s", dirstate[active ^ 1].path, p);
 
-				result = 0;
-				if (!(pid = fork()))
-					return execl("/bin/cp", "cp", "-Rfp", srcbuf, dstbuf, (char *)0);
-				waitpid(pid, &result, 0);
-
-				if (result < 0) {
+				if (draw_execwin(execw, "/bin/cp", 4, "cp", "-Rfpv", srcbuf, dstbuf) < 0)
 					draw_errwin(errwin, "Couldn't copy file or directory", p);
-					wrefresh(errwin);
-					do { cmd = getch(); }
-						while (cmd < 7 && 128 > cmd); // press any key
-					break;
-				}
 			}
 
 			dirstate[active].count = scandir(dirstate[active].path, &(dirstate[active].items), dot_filter, alphasort);
@@ -170,39 +152,24 @@ int main() {
 			updtflag = true;
 			break;
 		case KEY_F(6):
-			draw_actwin2(actwin2, "Move", dirstate[active].items[dirstate[active].choice]->d_name,
-				dirstate[active ^ 1].path);
-			wrefresh(actwin2);
-			do { cmd = getch(); }
-				while (cmd != 10 && 27 != cmd); // enter or esc
+			cmd = draw_actwin2(actwin2, "Move", dirstate[active].items[dirstate[active].choice]->d_name, dirstate[active ^ 1].path);
 
 			if (cmd != 27) {
 				p = dirstate[active].items[dirstate[active].choice]->d_name;
 				snprintf(srcbuf, MAX_STR-1, "%s/%s", dirstate[active].path, p);
 				snprintf(dstbuf, MAX_STR-1, "%s/%s", dirstate[active ^ 1].path, p);
 
-				result = 0;
-				if (!(pid = fork()))
-					return execl("/bin/mv", "mv", "-f", srcbuf, dstbuf, (char *)0);
-				waitpid(pid, &result, 0);
-
-				if (result < 0) {
+				if (draw_execwin(execw, "/bin/mv", 4, "mv", "-fv", srcbuf, dstbuf) < 0)
 					draw_errwin(errwin, "Couldn't move file or directory", p);
-					wrefresh(errwin);
-					do { cmd = getch(); }
-						while (cmd < 7 && 128 > cmd); // press any key
-					break;
-				}
+				else if (dirstate[active].choice > 0) dirstate[active].choice--;
 			}
 
-			if (dirstate[active].choice > 0) dirstate[active].choice--;
 			dirstate[active].count = scandir(dirstate[active].path, &(dirstate[active].items), dot_filter, alphasort);
 			dirstate[active ^ 1].count = scandir(dirstate[active ^ 1].path, &(dirstate[active ^ 1].items), dot_filter, alphasort);
 			updtflag = true;
 			break;
 		case KEY_F(7):
-			draw_actwin1(actwin1, "Create directory", "");
-			wrefresh(actwin1);
+			draw_pmtwin(actwin1, "Create directory", "");
 			i = snprintf(dstbuf, MAX_STR-1, "%s/", dirstate[active].path);
 			wattron(actwin1, COLOR_PAIR(1));
 
@@ -241,28 +208,15 @@ int main() {
 			updtflag = true;
 			break;
 		case KEY_F(8):
-			draw_actwin1(actwin1, "Delete", dirstate[active].items[dirstate[active].choice]->d_name);
-			wrefresh(actwin1);
-			do { cmd = getch(); }
-				while (cmd != 10 && 27 != cmd); // enter or esc
+			cmd = draw_actwin1(actwin1, "Delete", dirstate[active].items[dirstate[active].choice]->d_name);
 
 			if (cmd != 27) {
 				p = dirstate[active].items[dirstate[active].choice]->d_name;
 				snprintf(dstbuf, MAX_STR-1, "%s/%s", dirstate[active].path, p);
 
-				result = 0;
-				if (!(pid = fork()))
-					return execl("/bin/rm", "rm", "-rf", dstbuf, (char *)0);
-				waitpid(pid, &result, 0);
-
-				if (result < 0) {
+				if (draw_execwin(execw, "/bin/rm", 3, "rm", "-rfv", dstbuf) < 0)
 					draw_errwin(errwin, "Couldn't delete file or directory", p);
-					wrefresh(errwin);
-					do { cmd = getch(); }
-						while (cmd < 7 && 128 > cmd); // press any key
-					break;
-				}
-				if (dirstate[active].choice > 0) dirstate[active].choice--;
+				else if (dirstate[active].choice > 0) dirstate[active].choice--;
 			}
 
 			dirstate[active].count = scandir(dirstate[active].path, &(dirstate[active].items), dot_filter, alphasort);
@@ -299,13 +253,8 @@ int main() {
 					dirstate[active].choice = 0;
 				}
 			} else if (st.st_mode & S_IXUSR) {
-				if (draw_execwin(execw, dstbuf, 1, p) < 0) {
+				if (draw_execwin(execw, dstbuf, 1, p) < 0)
 					draw_errwin(errwin, "Couldn't exec", p);
-					wrefresh(errwin);
-				} else wrefresh(execw);
-
-				do { cmd = getch(); }
-					while (cmd < 7 && 128 > cmd); // press any key
 			}
 
 			updtflag = true;
@@ -324,13 +273,17 @@ int main() {
 
 	} while (!exitflag);
 
+	delwin(help);
+	delwin(actwin1);
+	delwin(actwin2);
+	delwin(errwin);
+	delwin(execw);
 	free(dirstate[0].items);
 	free(dirstate[1].items);
 	delwin(dirwin[0]);
 	delwin(dirwin[1]);
 	delwin(status);
 	delwin(menu);
-	delwin(errwin);
 	endwin();
 
 	return 0;
