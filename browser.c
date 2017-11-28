@@ -11,8 +11,10 @@
 
 #include "commander.h"
 
-int wprintw_m(WINDOW *win, int attrs, char *path, char *name) {
+int wvprintw_m(WINDOW *win, int row, int maxcols, int attrs, char *path, char *name) {
 	struct stat st, lst;
+	struct tm *time;
+	char buffer[MAX_STR];
 	int ret;
 
 	if (stat(path, &st) < 0 || lstat(path, &lst) < 0) return -1;
@@ -21,13 +23,17 @@ int wprintw_m(WINDOW *win, int attrs, char *path, char *name) {
 		attrs |= COLOR_PAIR(6);
 	if (attrs) wattron(win, attrs);
 
-	if (S_ISDIR(st.st_mode) && S_ISLNK(lst.st_mode)) wprintw(win, "~");
-	else if (S_ISDIR(st.st_mode)) wprintw(win, "/");
-	else if	(S_ISLNK(lst.st_mode)) wprintw(win, "@");
-	else if (st.st_mode & S_IXUSR) wprintw(win, "*");
+	if (S_ISDIR(st.st_mode) && S_ISLNK(lst.st_mode)) waddch(win, '~');
+	else if (S_ISDIR(st.st_mode)) waddch(win, '/');
+	else if	(S_ISLNK(lst.st_mode)) waddch(win, '@');
+	else if (st.st_mode & S_IXUSR) waddch(win, '*');
 
 	ret = wprintw(win, "%s", name);
 	if (attrs) wattroff(win, attrs);
+
+	time = localtime(&(st.st_mtime));
+	strftime(buffer, sizeof(buffer), "%b %_2d %H:%M", time);
+	mvwprintw(win, row, maxcols-13, "%s", buffer);
 
 	return ret;
 }
@@ -51,12 +57,13 @@ void browser(WINDOW *dir, wstate *s, int cmd, int active) {
 			snprintf(path, 2*MAX_STR-1, "%s/%s", s->path, s->items[i]->d_name);
 
 			if (s->start + cur == i && active)
-				wprintw_m(dir, A_REVERSE, path, s->items[i]->d_name);
-			else wprintw_m(dir, 0, path, s->items[i]->d_name);
+				wvprintw_m(dir, y, s->width, A_REVERSE, path, s->items[i]->d_name);
+			else wvprintw_m(dir, y, s->width, 0, path, s->items[i]->d_name);
 		} else {
 			wmove(dir, y, 1);
 			wclrtoeol(dir);
 		}
+		mvwprintw(dir, y, s->width-14, "│");
 	}
 
 	box(dir, 0, 0);

@@ -22,10 +22,13 @@
 #include <string.h>
 #include <ncurses.h>
 #include <locale.h>
+#include <time.h>
+#include "config.h"
 
 #define MENU_ITEMS 10
 #define POPUP_SIZE 54
 #define MAX_STR 1024
+#define EXEC_MAXARGS 10
 
 typedef struct {
 	int start;

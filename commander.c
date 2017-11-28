@@ -17,7 +17,7 @@ int dot_filter(const struct dirent *ent) {
 }
 
 int main() {
-	WINDOW **dirwin, *status, *menu, *help, *shell;
+	WINDOW **dirwin, *status, *menu, *help, *execw;
 	WINDOW *actwin1, *actwin2, *errwin;
 	char srcbuf[MAX_STR];
 	char dstbuf[MAX_STR];
@@ -69,8 +69,8 @@ int main() {
 	// Error window
 	errwin = newwin(8, POPUP_SIZE, LINES/2-5, COLS/2-POPUP_SIZE/2);
 
-	// Subshell window
-	shell = newwin(LINES-2, COLS, 1, 0);
+	// Exec window
+	execw = newwin(LINES-2, COLS, 1, 0);
 
 	refresh();
 	wrefresh(status);
@@ -112,7 +112,7 @@ int main() {
 
 			wresize(dirwin[0], dirstate[0].height, dirstate[0].width);
 			wresize(dirwin[1], dirstate[1].height, dirstate[1].width);
-			wresize(shell, LINES-2, COLS);
+			wresize(execw, LINES-2, COLS);
 
 			mvwin(dirwin[1], 1, COLS/2 - 1);
 			mvwin(help, LINES/2-7, COLS/2-POPUP_SIZE/2);
@@ -145,23 +145,24 @@ int main() {
 			wrefresh(actwin2);
 			do { cmd = getch(); }
 				while (cmd != 10 && 27 != cmd); // enter or esc
-			if (cmd == 27) break;
 
-			p = dirstate[active].items[dirstate[active].choice]->d_name;
-			snprintf(srcbuf, MAX_STR-1, "%s/%s", dirstate[active].path, p);
-			snprintf(dstbuf, MAX_STR-1, "%s/%s", dirstate[active ^ 1].path, p);
+			if (cmd != 27) {
+				p = dirstate[active].items[dirstate[active].choice]->d_name;
+				snprintf(srcbuf, MAX_STR-1, "%s/%s", dirstate[active].path, p);
+				snprintf(dstbuf, MAX_STR-1, "%s/%s", dirstate[active ^ 1].path, p);
 
-			result = 0;
-			if (!(pid = fork()))
-				return execl("/bin/cp", "cp", "-Rfp", srcbuf, dstbuf, (char *)0);
-			waitpid(pid, &result, 0);
+				result = 0;
+				if (!(pid = fork()))
+					return execl("/bin/cp", "cp", "-Rfp", srcbuf, dstbuf, (char *)0);
+				waitpid(pid, &result, 0);
 
-			if (result < 0) {
-				draw_errwin(errwin, "Couldn't copy file or directory", p);
-				wrefresh(errwin);
-				do { cmd = getch(); }
-					while (cmd < 7 && 128 > cmd); // press any key
-				break;
+				if (result < 0) {
+					draw_errwin(errwin, "Couldn't copy file or directory", p);
+					wrefresh(errwin);
+					do { cmd = getch(); }
+						while (cmd < 7 && 128 > cmd); // press any key
+					break;
+				}
 			}
 
 			dirstate[active].count = scandir(dirstate[active].path, &(dirstate[active].items), dot_filter, alphasort);
@@ -174,23 +175,24 @@ int main() {
 			wrefresh(actwin2);
 			do { cmd = getch(); }
 				while (cmd != 10 && 27 != cmd); // enter or esc
-			if (cmd == 27) break;
 
-			p = dirstate[active].items[dirstate[active].choice]->d_name;
-			snprintf(srcbuf, MAX_STR-1, "%s/%s", dirstate[active].path, p);
-			snprintf(dstbuf, MAX_STR-1, "%s/%s", dirstate[active ^ 1].path, p);
+			if (cmd != 27) {
+				p = dirstate[active].items[dirstate[active].choice]->d_name;
+				snprintf(srcbuf, MAX_STR-1, "%s/%s", dirstate[active].path, p);
+				snprintf(dstbuf, MAX_STR-1, "%s/%s", dirstate[active ^ 1].path, p);
 
-			result = 0;
-			if (!(pid = fork()))
-				return execl("/bin/mv", "mv", "-f", srcbuf, dstbuf, (char *)0);
-			waitpid(pid, &result, 0);
+				result = 0;
+				if (!(pid = fork()))
+					return execl("/bin/mv", "mv", "-f", srcbuf, dstbuf, (char *)0);
+				waitpid(pid, &result, 0);
 
-			if (result < 0) {
-				draw_errwin(errwin, "Couldn't move file or directory", p);
-				wrefresh(errwin);
-				do { cmd = getch(); }
-					while (cmd < 7 && 128 > cmd); // press any key
-				break;
+				if (result < 0) {
+					draw_errwin(errwin, "Couldn't move file or directory", p);
+					wrefresh(errwin);
+					do { cmd = getch(); }
+						while (cmd < 7 && 128 > cmd); // press any key
+					break;
+				}
 			}
 
 			if (dirstate[active].choice > 0) dirstate[active].choice--;
@@ -222,15 +224,16 @@ int main() {
 				}
 			}
 			*p = '\0';
-			if (cmd == 27) break;
 
-			if (lstat(dstbuf, &st) == 0 || mkdir(dstbuf, 0700) == -1) {
-				p = dstbuf + i;
-				draw_errwin(errwin, "Couldn't create directory", p);
-				wrefresh(errwin);
-				do { cmd = getch(); }
-					while (cmd < 7 && 128 > cmd); // press any key
-				break;
+			if (cmd != 27) {
+				if (lstat(dstbuf, &st) == 0 || mkdir(dstbuf, 0700) == -1) {
+					p = dstbuf + i;
+					draw_errwin(errwin, "Couldn't create directory", p);
+					wrefresh(errwin);
+					do { cmd = getch(); }
+						while (cmd < 7 && 128 > cmd); // press any key
+					break;
+				}
 			}
 
 			dirstate[active].count = scandir(dirstate[active].path, &(dirstate[active].items), dot_filter, alphasort);
@@ -242,25 +245,26 @@ int main() {
 			wrefresh(actwin1);
 			do { cmd = getch(); }
 				while (cmd != 10 && 27 != cmd); // enter or esc
-			if (cmd == 27) break;
 
-			p = dirstate[active].items[dirstate[active].choice]->d_name;
-			snprintf(dstbuf, MAX_STR-1, "%s/%s", dirstate[active].path, p);
+			if (cmd != 27) {
+				p = dirstate[active].items[dirstate[active].choice]->d_name;
+				snprintf(dstbuf, MAX_STR-1, "%s/%s", dirstate[active].path, p);
 
-			result = 0;
-			if (!(pid = fork()))
-				return execl("/bin/rm", "rm", "-rf", dstbuf, (char *)0);
-			waitpid(pid, &result, 0);
+				result = 0;
+				if (!(pid = fork()))
+					return execl("/bin/rm", "rm", "-rf", dstbuf, (char *)0);
+				waitpid(pid, &result, 0);
 
-			if (result < 0) {
-				draw_errwin(errwin, "Couldn't delete file or directory", p);
-				wrefresh(errwin);
-				do { cmd = getch(); }
-					while (cmd < 7 && 128 > cmd); // press any key
-				break;
+				if (result < 0) {
+					draw_errwin(errwin, "Couldn't delete file or directory", p);
+					wrefresh(errwin);
+					do { cmd = getch(); }
+						while (cmd < 7 && 128 > cmd); // press any key
+					break;
+				}
+				if (dirstate[active].choice > 0) dirstate[active].choice--;
 			}
 
-			if (dirstate[active].choice > 0) dirstate[active].choice--;
 			dirstate[active].count = scandir(dirstate[active].path, &(dirstate[active].items), dot_filter, alphasort);
 			dirstate[active ^ 1].count = scandir(dirstate[active ^ 1].path, &(dirstate[active ^ 1].items), dot_filter, alphasort);
 			updtflag = true;
@@ -295,10 +299,10 @@ int main() {
 					dirstate[active].choice = 0;
 				}
 			} else if (st.st_mode & S_IXUSR) {
-				if (draw_shell(shell, dstbuf, p) < 0) {
+				if (draw_execwin(execw, dstbuf, 1, p) < 0) {
 					draw_errwin(errwin, "Couldn't exec", p);
 					wrefresh(errwin);
-				} else wrefresh(shell);
+				} else wrefresh(execw);
 
 				do { cmd = getch(); }
 					while (cmd < 7 && 128 > cmd); // press any key
