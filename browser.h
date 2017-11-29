@@ -12,6 +12,6 @@
 #ifndef _BROWSER_H
 #define _BROWSER_H
 
-void browser(WINDOW *dir, wstate *state, int cmd, int active);
+int browser(WINDOW *dir, wstate *state, int cmd, int active);
 
 #endif // _BROWSER_H

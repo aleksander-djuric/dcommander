@@ -38,9 +38,11 @@ int wvprintw_m(WINDOW *win, int row, int maxcols, int attrs, char *path, char *n
 	return ret;
 }
 
-void browser(WINDOW *dir, wstate *s, int cmd, int active) {
+int browser(WINDOW *dir, wstate *s, int cmd, int active) {
 	char path[2*MAX_STR];
 	int i, y, cur, len, lines;
+
+	if (s->count < 0) return -1;
 
 	cur = s->choice - s->start;
 	lines = s->height - 2;
@@ -114,4 +116,6 @@ void browser(WINDOW *dir, wstate *s, int cmd, int active) {
 	}
 
 	s->choice = cur + s->start;
+
+	return 0;
 }

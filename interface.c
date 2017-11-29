@@ -54,14 +54,19 @@ int draw_help(WINDOW *win) {
 	mvwprintw(win, 7, 2, "This is free software, and you are welcome to");
 	mvwprintw(win, 8, 2, "redistribute it under terms of GNU General Public");
 	mvwprintw(win, 9, 2, "License. Press any key to continue..");
+	wrefresh(win);
 
 	do { rc = getch(); }
 		while (rc < 7 && 128 > rc); // press any key
-		
+
 	return rc;
 }
 
-void draw_pmtwin(WINDOW *win, char *caption, char *dst) {
+int draw_pmtwin(WINDOW *win, char *caption, char *str) {
+	char *s, *p;
+	int x, y;
+	int rc = 0;
+
 	wbkgd(win, COLOR_PAIR(2));
 	box(win, 0, 0);
 	mvwhline(win, 1, 2, ' ', 50);
@@ -71,9 +76,32 @@ void draw_pmtwin(WINDOW *win, char *caption, char *dst) {
 	mvwprintw(win, 6, POPUP_SIZE/2-18, "Press Enter to confirm, Esc to exit.");
 	wattron(win, COLOR_PAIR(1));
 	mvwhline(win, 4, 2, ' ', 50);
-	mvwprintw(win, 4, 2, "%.50s", dst);
+	mvwprintw(win, 4, 2, "%.50s", str);
 	wattroff(win, COLOR_PAIR(2));
 	wrefresh(win);
+
+	wattron(win, COLOR_PAIR(1));
+
+	s = p = str;
+	getyx(win, y, x);
+	while (p - str < MAX_STR) {
+		rc = getchar();
+		if (rc == 13 || 27 == rc) break;
+		else if (rc == KEY_BACKSPACE || rc == 127) { // del
+			if (p == s) continue;
+			p--, x--;
+			mvwaddch(win, y, x, ' ');
+			wmove(win, y, x);
+			wrefresh(win);
+		} else {
+			wprintw(win, "%c", rc);
+			*p = rc, x++, p++;
+			wrefresh(win);
+		}
+	}
+	*p = '\0';
+
+	return rc;
 }
 
 int draw_actwin1(WINDOW *win, char *caption, char *dst) {
@@ -94,7 +122,7 @@ int draw_actwin1(WINDOW *win, char *caption, char *dst) {
 
 	do { rc = getch(); }
 		while (rc != 10 && 27 != rc); // enter or esc
-		
+
 	return rc;
 }
 
@@ -121,11 +149,11 @@ int draw_actwin2(WINDOW *win, char *caption, char *src, char *dst) {
 
 	do { rc = getch(); }
 		while (rc != 10 && 27 != rc); // enter or esc
-		
+
 	return rc;
 }
 
-int draw_errwin(WINDOW *win, char *caption, char *desc) {
+int draw_errwin(WINDOW *win, char *caption, int error) {
 	int rc = 0;
 
 	wbkgd(win, COLOR_PAIR(4));
@@ -137,13 +165,13 @@ int draw_errwin(WINDOW *win, char *caption, char *desc) {
 	mvwprintw(win, 6, POPUP_SIZE/2-11, "Press any key to exit.");
 	wattron(win, COLOR_PAIR(5));
 	mvwhline(win, 4, 2, ' ', 50);
-	mvwprintw(win, 4, 2, "%.50s", desc);
+	mvwprintw(win, 4, 2, "%.50s", strerror(error));
 	wattroff(win, COLOR_PAIR(4));
 	wrefresh(win);
 
 	do { rc = getch(); }
 		while (rc < 7 && 128 > rc); // press any key
-		
+
 	return rc;
 }
 

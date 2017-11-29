@@ -23,6 +23,7 @@
 #include <ncurses.h>
 #include <locale.h>
 #include <time.h>
+#include <errno.h>
 #include "config.h"
 
 #define MENU_ITEMS 10
