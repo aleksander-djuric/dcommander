@@ -170,15 +170,15 @@ int main() {
 			snprintf(dstbuf, MAX_STR-1, "%s/%s", dirstate[active].path, p);
 			if (stat(dstbuf, &st) < 0) break;
 
-			if (S_ISDIR(st.st_mode)) {
-				if (lstat(dstbuf, &st) < 0) break;
-				strncpy(dirstate[active].path, dstbuf, MAX_STR-1);
+			if (S_ISDIR(st.st_mode) && chdir(dstbuf) == 0) {
+				if (getcwd(dirstate[active].path, MAX_STR-1) == NULL)
+					strncpy(dirstate[active].path, dstbuf, MAX_STR-1);
 				dirstate[active].count = scandir(dirstate[active].path, &(dirstate[active].items), dot_filter, alphasort);
 
 				if (*p == '.' && *(p + 1) == '.') {
 					dirstate[active].choice = dirstate[active].prev;
 					dirstate[active].prev = 0;
-				} else if (S_ISLNK(st.st_mode)) {
+				} else if (lstat(dstbuf, &st) == 0 && S_ISLNK(st.st_mode)) {
 					dirstate[active].prev = 0;
 					dirstate[active].choice = 0;
 				} else {
@@ -189,6 +189,9 @@ int main() {
 				if (draw_execwin(execw, dstbuf, 1, p) < 0)
 					draw_errwin(errwin, "Error", errno);
 			}
+
+			draw_statbar(status, "%s", dirstate[active].path);
+			wrefresh(status);
 
 			updtflag = 2;
 			break;
