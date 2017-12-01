@@ -15,7 +15,7 @@
 #define PAGE_SIZE 4096
 #endif
 
-void ncstart() {
+void setup_term() {
 	initscr();
 	keypad(stdscr, true);
 	noecho();
@@ -32,8 +32,6 @@ void ncstart() {
 		init_pair(6, COLOR_YELLOW, COLOR_BLUE);	// selected
 	}
 
-	wbkgd(stdscr, COLOR_PAIR(1));
-	refresh();
 	timeout(0);
 	set_escdelay(0);
 //	curs_set(0);
@@ -176,7 +174,7 @@ int draw_errwin(WINDOW *win, char *caption, int error) {
 }
 
 void draw_menubar(WINDOW *win, int size) {
-	const char* buttons[MENU_ITEMS] = { "Help", "", "", "", "Copy", "Move", "Folder+", "Delete", "", "Exit" };
+	const char* buttons[MENU_ITEMS] = { "Help", "", "View", "Edit", "Copy", "Move", "Folder+", "Delete", "", "Exit" };
 	int bs = size / MENU_ITEMS;
 	int br = size % MENU_ITEMS;
 	int i, pos;

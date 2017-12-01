@@ -12,7 +12,7 @@
 #ifndef _INTERFACE_H
 #define _INTERFACE_H
 
-void ncstart();
+void setup_term();
 void draw_menubar(WINDOW *win, int size);
 void draw_statbar(WINDOW *win, const char *fmt, ...);
 int draw_help(WINDOW *win);

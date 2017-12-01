@@ -12,62 +12,25 @@
 #include "interface.h"
 #include "browser.h"
 
-int dot_filter(const struct dirent *ent) {
-	return strcmp(ent->d_name, ".");
-}
+WINDOW *dirwin[2], *actwin1, *actwin2, *errwin;
+WINDOW *status, *menu, *help, *execw;
+wstate dirstate[2];
+
+void draw_windows(int cols, int rows);
+void delete_windows(void);
+int dot_filter(const struct dirent *ent);
 
 int main() {
-	WINDOW **dirwin, *actwin1, *actwin2, *errwin;
-	WINDOW *status, *menu, *help, *execw;
 	char srcbuf[MAX_STR];
 	char dstbuf[MAX_STR];
-	wstate dirstate[2];
 	int active, cmd = 0;
 	int exitflag = 0;
 	int updtflag = 0;
 
 	setlocale(LC_ALL, "");
-
-	dirwin = calloc(2, sizeof(WINDOW *));
-	if (!dirwin) return -1;
-
-	ncstart();
-
+	setup_term();
 	memset(dirstate, 0, sizeof(dirstate));
-	dirstate[0].width = COLS/2 - 1;
-	dirstate[0].height = LINES - 2;
-	dirstate[0].items = NULL;
-	dirstate[1].width = COLS - (COLS/2 - 1);
-	dirstate[1].height = LINES - 2;
-	dirstate[1].items = NULL;
-
-	// Status bar
-	status = newwin(1, COLS, 0, 0);
-	draw_statbar(status, "");
-
-	// Bottom bar
-	menu = newwin(1, COLS, LINES-1, 0);
-	draw_menubar(menu, COLS);
-
-	// Panels
-	dirwin[0] = newwin(dirstate[0].height, dirstate[0].width, 1, 0);
-	wbkgd(dirwin[0], COLOR_PAIR(1));
-	box(dirwin[0], 0, 0);
-	dirwin[1] = newwin(dirstate[1].height, dirstate[1].width, 1, COLS/2 - 1);
-	wbkgd(dirwin[1], COLOR_PAIR(1));
-	box(dirwin[1], 0, 0);
-
-	help = newwin(12, POPUP_SIZE, LINES/2-7, COLS/2-POPUP_SIZE/2); // Help window
-	actwin1 = newwin(8, POPUP_SIZE, LINES/2-5, COLS/2-POPUP_SIZE/2); // Action 1 window
-	actwin2 = newwin(10, POPUP_SIZE, LINES/2-6, COLS/2-POPUP_SIZE/2); // Action 2 window
-	errwin = newwin(8, POPUP_SIZE, LINES/2-5, COLS/2-POPUP_SIZE/2); // Error window
-	execw = newwin(LINES-2, COLS, 1, 0); // Exec window
-
-	refresh();
-	wrefresh(status);
-	wrefresh(dirwin[0]);
-	wrefresh(dirwin[1]);
-	wrefresh(menu);
+	draw_windows(COLS, LINES);
 
 	if (getcwd(dirstate[0].path, MAX_STR-1) == NULL)
 		snprintf(dirstate[0].path, MAX_STR-1, "/");
@@ -85,47 +48,50 @@ int main() {
 		struct stat st;
 		char *p;
 		pid_t pid;
-		int rc, x, y;
+		int rc;
 
 		cmd = getch();
 		switch (cmd) {
 		case KEY_F(1):
+		case 80:
 			draw_help(help);
 			updtflag = 2;
 			break;
 		case KEY_F(3):
+		case 82:
 			p = dirstate[active].items[dirstate[active].choice]->d_name;
 			snprintf(dstbuf, MAX_STR-1, "%s/%s", dirstate[active].path, p);
-			getyx(dirwin[active], y, x);
+
+			savetty();
+			delete_windows();
 
 			if ((pid = fork()) == 0)
 				return execl("/usr/bin/mcview", "mcview", dstbuf, (char *)0);
-			waitpid(pid, &rc, WNOHANG);
+			waitpid(pid, &rc, 0);
+
+			resetty();
+			draw_windows(COLS, LINES);
+
 			if (rc < 0) draw_errwin(errwin, "Error", errno);
-
-			wrefresh(status);
-			wrefresh(dirwin[0]);
-			wrefresh(dirwin[1]);
-			wrefresh(menu);
-			wmove(dirwin[active], y, x);
-
+			updtflag = 2;
 			break;
 		case KEY_F(4):
+		case 83:
 			p = dirstate[active].items[dirstate[active].choice]->d_name;
 			snprintf(dstbuf, MAX_STR-1, "%s/%s", dirstate[active].path, p);
-			getyx(dirwin[active], y, x);
+
+			savetty();
+			delete_windows();
 
 			if ((pid = fork()) == 0)
 				return execl("/usr/bin/mcedit", "mcedit", dstbuf, (char *)0);
-			waitpid(pid, &rc, WNOHANG);
+			waitpid(pid, &rc, 0);
+
+			resetty();
+			draw_windows(COLS, LINES);
+
 			if (rc < 0) draw_errwin(errwin, "Errwin", errno);
-
-			wrefresh(status);
-			wrefresh(dirwin[0]);
-			wrefresh(dirwin[1]);
-			wrefresh(menu);
-			wmove(dirwin[active], y, x);
-
+			updtflag = 2;
 			break;
 		case KEY_F(5):
 			cmd = draw_actwin2(actwin2, "Copy", dirstate[active].items[dirstate[active].choice]->d_name, dirstate[active ^ 1].path);
@@ -281,18 +247,61 @@ int main() {
 		}
 	} while (!exitflag);
 
+	free(dirstate[0].items);
+	free(dirstate[1].items);
+	delete_windows();
+
+	return 0;
+}
+
+void draw_windows(int cols, int rows) {
+	dirstate[0].width = cols/2 - 1;
+	dirstate[0].height = rows - 2;
+	dirstate[1].width = cols - (cols/2 - 1);
+	dirstate[1].height = rows - 2;
+
+	// Status bar
+	status = newwin(1, cols, 0, 0);
+	draw_statbar(status, "");
+
+	// Bottom bar
+	menu = newwin(1, cols, rows-1, 0);
+	draw_menubar(menu, cols);
+
+	// Panels
+	dirwin[0] = newwin(dirstate[0].height, dirstate[0].width, 1, 0);
+	wbkgd(dirwin[0], COLOR_PAIR(1));
+	box(dirwin[0], 0, 0);
+	dirwin[1] = newwin(dirstate[1].height, dirstate[1].width, 1, cols/2 - 1);
+	wbkgd(dirwin[1], COLOR_PAIR(1));
+	box(dirwin[1], 0, 0);
+
+	help = newwin(12, POPUP_SIZE, rows/2-7, cols/2-POPUP_SIZE/2); // Help window
+	actwin1 = newwin(8, POPUP_SIZE, rows/2-5, cols/2-POPUP_SIZE/2); // Action 1 window
+	actwin2 = newwin(10, POPUP_SIZE, rows/2-6, cols/2-POPUP_SIZE/2); // Action 2 window
+	errwin = newwin(8, POPUP_SIZE, rows/2-5, cols/2-POPUP_SIZE/2); // Error window
+	execw = newwin(rows-2, cols, 1, 0); // Exec window
+
+	refresh();
+	wrefresh(status);
+	wrefresh(dirwin[0]);
+	wrefresh(dirwin[1]);
+	wrefresh(menu);
+}
+
+void delete_windows(void) {
 	delwin(help);
 	delwin(actwin1);
 	delwin(actwin2);
 	delwin(errwin);
 	delwin(execw);
-	free(dirstate[0].items);
-	free(dirstate[1].items);
 	delwin(dirwin[0]);
 	delwin(dirwin[1]);
 	delwin(status);
 	delwin(menu);
 	endwin();
+}
 
-	return 0;
+int dot_filter(const struct dirent *ent) {
+	return strcmp(ent->d_name, ".");
 }

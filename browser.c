@@ -74,12 +74,14 @@ int browser(WINDOW *dir, wstate *s, int cmd, int active) {
 
 	switch (cmd) {
 	case KEY_UP:
+//	case 65:
 		if (cur == 0) {
 			if (s->start != 0) (s->start)--;
 			else break;
 		} else cur--;
 		break;
 	case KEY_DOWN:
+//	case 66:
 		if (cur == (len - 1)) {
 			if (s->start < s->count - lines)
 				s->start++;
@@ -104,9 +106,13 @@ int browser(WINDOW *dir, wstate *s, int cmd, int active) {
 		} else cur = i - 1;
 		break;
 	case KEY_HOME:
+	case KEY_LEFT:
+//	case 68:
 		cur = s->start;
 		break;
 	case KEY_END:
+	case KEY_RIGHT:
+//	case 67:
 		i = s->count - s->start;
 		if (i > lines) cur = lines - 1;
 		else cur = i - 1;
