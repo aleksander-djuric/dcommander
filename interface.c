@@ -252,9 +252,11 @@ int draw_execwin(WINDOW *win, char *path, int argc, ...) {
 		waddnstr(win, buffer, size);
 	waddch(win, '\n');
 
-	wrefresh(win);
-	do { rc = getch(); }
-		while (rc < 7 && 128 > rc); // press any key
+//	if (mode) {
+//		wrefresh(win);
+//		do { rc = getch(); }
+//			while (rc < 7 && 128 > rc); // press any key
+//	}
 
 	return 0;
 }

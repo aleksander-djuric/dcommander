@@ -12,6 +12,8 @@
 #include "interface.h"
 #include "browser.h"
 
+#define CTRL(x) ((x) & 0x1f)
+
 WINDOW *dirwin[2], *actwin1, *actwin2, *errwin;
 WINDOW *status, *menu, *help, *execw;
 wstate dirstate[2];
@@ -222,6 +224,13 @@ int main() {
 
 			wrefresh(status);
 			wrefresh(menu);
+			updtflag = 2;
+
+			break;
+		case CTRL('o'):
+			redrawwin(execw);
+			wrefresh(execw);
+			while (getch() != CTRL('o'));
 			updtflag = 2;
 
 			break;
