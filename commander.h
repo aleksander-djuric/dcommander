@@ -15,15 +15,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <dirent.h>
-#include <sys/stat.h>
+#include <fcntl.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/poll.h>
 #include <sys/wait.h>
-#include <string.h>
-#include <ncurses.h>
-#include <locale.h>
 #include <time.h>
+#include <string.h>
+#include <dirent.h>
+#include <ncurses.h>
 #include <errno.h>
+#include <locale.h>
 #include "config.h"
 
 #define MENU_ITEMS 10

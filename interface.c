@@ -212,9 +212,11 @@ int draw_execwin(WINDOW *win, char *path, int argc, ...) {
 	int fd[2];
 	int i, rc, size;
 
+/*
 	wbkgd(win, COLOR_PAIR(3));
 	keypad(win, true);
 	scrollok(win, true);
+*/
 
 	va_start(ap, argc);
 	waddch(win, '>');
@@ -252,11 +254,6 @@ int draw_execwin(WINDOW *win, char *path, int argc, ...) {
 		waddnstr(win, buffer, size);
 	waddch(win, '\n');
 
-//	if (mode) {
-//		wrefresh(win);
-//		do { rc = getch(); }
-//			while (rc < 7 && 128 > rc); // press any key
-//	}
-
 	return 0;
 }
+

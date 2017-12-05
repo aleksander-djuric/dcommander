@@ -11,6 +11,7 @@
 #include "commander.h"
 #include "interface.h"
 #include "browser.h"
+#include "copy_file.h"
 
 #define CTRL(x) ((x) & 0x1f)
 
@@ -22,7 +23,16 @@ void draw_windows(int cols, int rows);
 void delete_windows(void);
 int dot_filter(const struct dirent *ent);
 
+void cpcb(cp_state *s) {
+	int pcnt = (s->cp_cur * 100. / (s->cp_top + 1));
+
+	if (!(pcnt % 10))
+		wprintw(s->stat, "%s %s to %s %d%%\n", s->move_flag ? "moving" : "copying",
+			s->src, s->dst, pcnt);
+}
+
 int main() {
+	cp_callback cpcb_ptr = cpcb;
 	char srcbuf[MAX_STR];
 	char dstbuf[MAX_STR];
 	int active, cmd = 0;
@@ -103,8 +113,8 @@ int main() {
 				snprintf(srcbuf, MAX_STR-1, "%s/%s", dirstate[active].path, p);
 				snprintf(dstbuf, MAX_STR-1, "%s/%s", dirstate[active ^ 1].path, p);
 
-				if (draw_execwin(execw, "/bin/cp", 4, "cp", "-Rfpv", srcbuf, dstbuf) < 0)
-					draw_errwin(errwin, "Errno", errno);
+				if ((rc = copy_file(execw, srcbuf, dstbuf, 0, cpcb_ptr)) < 0)
+					draw_errwin(errwin, "Copy error", errno);
 			}
 
 			dirstate[active].count = scandir(dirstate[active].path, &(dirstate[active].items), dot_filter, alphasort);
@@ -119,8 +129,8 @@ int main() {
 				snprintf(srcbuf, MAX_STR-1, "%s/%s", dirstate[active].path, p);
 				snprintf(dstbuf, MAX_STR-1, "%s/%s", dirstate[active ^ 1].path, p);
 
-				if (draw_execwin(execw, "/bin/mv", 4, "mv", "-fv", srcbuf, dstbuf) < 0)
-					draw_errwin(errwin, "Errno", errno);
+				if ((rc = copy_file(execw, srcbuf, dstbuf, 1, cpcb_ptr)) < 0)
+					draw_errwin(errwin, "Move error", errno);
 				else if (dirstate[active].choice > 0) dirstate[active].choice--;
 			}
 
@@ -130,12 +140,12 @@ int main() {
 			break;
 		case KEY_F(7):
 			srcbuf[0] = '\0';
-			cmd = draw_pmtwin(actwin1, "Create directory", srcbuf);
+			cmd = draw_pmtwin(actwin1, "Create folder", srcbuf);
 			snprintf(dstbuf, MAX_STR-1, "%s/%s", dirstate[active].path, srcbuf);
 
 			if (cmd != 27) {
-				if (draw_execwin(execw, "/bin/mkdir", 4, "mkdir", "-vm", "0700", dstbuf) < 0)
-					draw_errwin(errwin, "Error", errno);
+				if (mkdir(dstbuf, 0700) < 0)
+					draw_errwin(errwin, "Create folder error", errno);
 			}
 
 			dirstate[active].count = scandir(dirstate[active].path, &(dirstate[active].items), dot_filter, alphasort);
@@ -149,8 +159,8 @@ int main() {
 				p = dirstate[active].items[dirstate[active].choice]->d_name;
 				snprintf(dstbuf, MAX_STR-1, "%s/%s", dirstate[active].path, p);
 
-				if (draw_execwin(execw, "/bin/rm", 3, "rm", "-rfv", dstbuf) < 0)
-					draw_errwin(errwin, "Error", errno);
+				if (remove(dstbuf) < 0)
+					draw_errwin(errwin, "Delete error", errno);
 				else if (dirstate[active].choice > 0) dirstate[active].choice--;
 			}
 
@@ -293,6 +303,9 @@ void draw_windows(int cols, int rows) {
 	actwin2 = newwin(10, POPUP_SIZE, rows/2-6, cols/2-POPUP_SIZE/2); // Action 2 window
 	errwin = newwin(8, POPUP_SIZE, rows/2-5, cols/2-POPUP_SIZE/2); // Error window
 	execw = newwin(rows-2, cols, 1, 0); // Exec window
+
+	wbkgd(execw, COLOR_PAIR(3));
+	scrollok(execw, true);
 
 	refresh();
 	wrefresh(status);
