@@ -15,7 +15,7 @@
 
 #define CTRL(x) ((x) & 0x1f)
 
-WINDOW *dirwin[2], *actwin1, *actwin2, *errwin;
+WINDOW *dirwin[2], *actwin1, *actwin2;
 WINDOW *status, *menu, *help, *execw;
 wstate dirstate[2];
 
@@ -24,17 +24,23 @@ void delete_windows(void);
 int dot_filter(const struct dirent *ent);
 
 void cpcb(cp_state *s) {
-	int pcnt = (s->cp_cur * 100. / (s->cp_top + 1));
+	char caption[50];
+	int pcnt = (s->curpos * 100. / (s->size + 1));
 
-	if (!(pcnt % 10))
-		wprintw(s->stat, "%s %s to %s %d%%\n", s->move_flag ? "moving" : "copying",
-			s->src, s->dst, pcnt);
+	if ((pcnt % 10)) return;
+
+	if (s->func == CP_MODE_REMOVE) sprintf(caption, "Removing...");
+	else if (s->func == CP_MODE_MOVE) sprintf(caption, "Moving...");
+	else if (s->func == CP_MODE_COPY) sprintf(caption, "Copying...");
+	else return;
+
+	draw_prgsbar(s->stat, caption, s->src, s->dst, pcnt);
 }
 
 int main() {
 	cp_callback cpcb_ptr = cpcb;
-	char srcbuf[MAX_STR];
-	char dstbuf[MAX_STR];
+	char srcbuf[PATH_MAX];
+	char dstbuf[PATH_MAX];
 	int active, cmd = 0;
 	int exitflag = 0;
 	int updtflag = 0;
@@ -44,9 +50,9 @@ int main() {
 	memset(dirstate, 0, sizeof(dirstate));
 	draw_windows(COLS, LINES);
 
-	if (getcwd(dirstate[0].path, MAX_STR-1) == NULL)
-		snprintf(dirstate[0].path, MAX_STR-1, "/");
-	snprintf(dirstate[1].path, MAX_STR-1, "/");
+	if (getcwd(dirstate[0].path, PATH_MAX-1) == NULL)
+		snprintf(dirstate[0].path, PATH_MAX-1, "/");
+	snprintf(dirstate[1].path, PATH_MAX-1, "/");
 
 	dirstate[0].count = scandir(dirstate[0].path, &(dirstate[0].items), dot_filter, alphasort);
 	dirstate[1].count = scandir(dirstate[1].path, &(dirstate[1].items), dot_filter, alphasort);
@@ -72,7 +78,7 @@ int main() {
 		case KEY_F(3):
 		case 82:
 			p = dirstate[active].items[dirstate[active].choice]->d_name;
-			snprintf(dstbuf, MAX_STR-1, "%s/%s", dirstate[active].path, p);
+			snprintf(dstbuf, PATH_MAX-1, "%s/%s", dirstate[active].path, p);
 
 			savetty();
 			delete_windows();
@@ -84,13 +90,13 @@ int main() {
 			resetty();
 			draw_windows(COLS, LINES);
 
-			if (rc < 0) draw_errwin(errwin, "Error", errno);
+			if (rc < 0) draw_errwin(actwin1, "Viewer exec error", errno);
 			updtflag = 2;
 			break;
 		case KEY_F(4):
 		case 83:
 			p = dirstate[active].items[dirstate[active].choice]->d_name;
-			snprintf(dstbuf, MAX_STR-1, "%s/%s", dirstate[active].path, p);
+			snprintf(dstbuf, PATH_MAX-1, "%s/%s", dirstate[active].path, p);
 
 			savetty();
 			delete_windows();
@@ -102,7 +108,7 @@ int main() {
 			resetty();
 			draw_windows(COLS, LINES);
 
-			if (rc < 0) draw_errwin(errwin, "Errwin", errno);
+			if (rc < 0) draw_errwin(actwin1, "Editor exec error", errno);
 			updtflag = 2;
 			break;
 		case KEY_F(5):
@@ -110,11 +116,11 @@ int main() {
 
 			if (cmd != 27) {
 				p = dirstate[active].items[dirstate[active].choice]->d_name;
-				snprintf(srcbuf, MAX_STR-1, "%s/%s", dirstate[active].path, p);
-				snprintf(dstbuf, MAX_STR-1, "%s/%s", dirstate[active ^ 1].path, p);
+				snprintf(srcbuf, PATH_MAX-1, "%s/%s", dirstate[active].path, p);
+				snprintf(dstbuf, PATH_MAX-1, "%s/%s", dirstate[active ^ 1].path, p);
 
-				if ((rc = copy_file(execw, srcbuf, dstbuf, 0, cpcb_ptr)) < 0)
-					draw_errwin(errwin, "Copy error", errno);
+				if ((rc = copy_file(actwin2, srcbuf, dstbuf, CP_MODE_COPY, cpcb_ptr)) < 0)
+					draw_errwin(actwin1, "Copy error", errno);
 			}
 
 			dirstate[active].count = scandir(dirstate[active].path, &(dirstate[active].items), dot_filter, alphasort);
@@ -126,11 +132,11 @@ int main() {
 
 			if (cmd != 27) {
 				p = dirstate[active].items[dirstate[active].choice]->d_name;
-				snprintf(srcbuf, MAX_STR-1, "%s/%s", dirstate[active].path, p);
-				snprintf(dstbuf, MAX_STR-1, "%s/%s", dirstate[active ^ 1].path, p);
+				snprintf(srcbuf, PATH_MAX-1, "%s/%s", dirstate[active].path, p);
+				snprintf(dstbuf, PATH_MAX-1, "%s/%s", dirstate[active ^ 1].path, p);
 
-				if ((rc = copy_file(execw, srcbuf, dstbuf, 1, cpcb_ptr)) < 0)
-					draw_errwin(errwin, "Move error", errno);
+				if ((rc = copy_file(actwin2, srcbuf, dstbuf, CP_MODE_MOVE, cpcb_ptr)) < 0)
+					draw_errwin(actwin1, "Move error", errno);
 				else if (dirstate[active].choice > 0) dirstate[active].choice--;
 			}
 
@@ -141,11 +147,11 @@ int main() {
 		case KEY_F(7):
 			srcbuf[0] = '\0';
 			cmd = draw_pmtwin(actwin1, "Create folder", srcbuf);
-			snprintf(dstbuf, MAX_STR-1, "%s/%s", dirstate[active].path, srcbuf);
+			snprintf(dstbuf, PATH_MAX-1, "%s/%s", dirstate[active].path, srcbuf);
 
 			if (cmd != 27) {
 				if (mkdir(dstbuf, 0700) < 0)
-					draw_errwin(errwin, "Create folder error", errno);
+					draw_errwin(actwin1, "Create folder error", errno);
 			}
 
 			dirstate[active].count = scandir(dirstate[active].path, &(dirstate[active].items), dot_filter, alphasort);
@@ -157,10 +163,10 @@ int main() {
 
 			if (cmd != 27) {
 				p = dirstate[active].items[dirstate[active].choice]->d_name;
-				snprintf(dstbuf, MAX_STR-1, "%s/%s", dirstate[active].path, p);
+				snprintf(dstbuf, PATH_MAX-1, "%s/%s", dirstate[active].path, p);
 
-				if (remove(dstbuf) < 0)
-					draw_errwin(errwin, "Delete error", errno);
+				if (remove_file(actwin2, dstbuf, CP_MODE_REMOVE, cpcb_ptr) < 0)
+					draw_errwin(actwin1, "Delete error", errno);
 				else if (dirstate[active].choice > 0) dirstate[active].choice--;
 			}
 
@@ -179,12 +185,12 @@ int main() {
 		case KEY_ENTER:
 		case 10:
 			p = dirstate[active].items[dirstate[active].choice]->d_name;
-			snprintf(dstbuf, MAX_STR-1, "%s/%s", dirstate[active].path, p);
+			snprintf(dstbuf, PATH_MAX-1, "%s/%s", dirstate[active].path, p);
 			if (stat(dstbuf, &st) < 0) break;
 
 			if (S_ISDIR(st.st_mode) && chdir(dstbuf) == 0) {
-				if (getcwd(dirstate[active].path, MAX_STR-1) == NULL)
-					strncpy(dirstate[active].path, dstbuf, MAX_STR-1);
+				if (getcwd(dirstate[active].path, PATH_MAX-1) == NULL)
+					strncpy(dirstate[active].path, dstbuf, PATH_MAX-1);
 				dirstate[active].count = scandir(dirstate[active].path, &(dirstate[active].items), dot_filter, alphasort);
 
 				if (*p == '.' && *(p + 1) == '.') {
@@ -199,7 +205,7 @@ int main() {
 				}
 			} else if (st.st_mode & S_IXUSR) {
 				if (draw_execwin(execw, dstbuf, 1, p) < 0)
-					draw_errwin(errwin, "Error", errno);
+					draw_errwin(actwin1, "Exec error", errno);
 			}
 
 			draw_statbar(status, "%s", dirstate[active].path);
@@ -227,7 +233,6 @@ int main() {
 			mvwin(help, LINES/2-7, COLS/2-POPUP_SIZE/2);
 			mvwin(actwin1, LINES/2-5, COLS/2-POPUP_SIZE/2);
 			mvwin(actwin2, LINES/2-6, COLS/2-POPUP_SIZE/2);
-			mvwin(errwin, LINES/2-5, COLS/2-POPUP_SIZE/2);
 
 			dirstate[0].choice = dirstate[0].start;
 			dirstate[1].choice = dirstate[1].start;
@@ -301,9 +306,9 @@ void draw_windows(int cols, int rows) {
 	help = newwin(12, POPUP_SIZE, rows/2-7, cols/2-POPUP_SIZE/2); // Help window
 	actwin1 = newwin(8, POPUP_SIZE, rows/2-5, cols/2-POPUP_SIZE/2); // Action 1 window
 	actwin2 = newwin(10, POPUP_SIZE, rows/2-6, cols/2-POPUP_SIZE/2); // Action 2 window
-	errwin = newwin(8, POPUP_SIZE, rows/2-5, cols/2-POPUP_SIZE/2); // Error window
-	execw = newwin(rows-2, cols, 1, 0); // Exec window
 
+	// Log window
+	execw = newwin(rows-2, cols, 1, 0);
 	wbkgd(execw, COLOR_PAIR(3));
 	scrollok(execw, true);
 
@@ -318,7 +323,6 @@ void delete_windows(void) {
 	delwin(help);
 	delwin(actwin1);
 	delwin(actwin2);
-	delwin(errwin);
 	delwin(execw);
 	delwin(dirwin[0]);
 	delwin(dirwin[1]);

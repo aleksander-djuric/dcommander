@@ -34,11 +34,11 @@ void setup_term() {
 
 	timeout(0);
 	set_escdelay(0);
-//	curs_set(0);
+	curs_set(0);
 }
 
-int draw_help(WINDOW *win) {
-	int rc = 0;
+void draw_help(WINDOW *win) {
+	int rc;
 
 	wbkgd(win, COLOR_PAIR(2));
 	box(win, 0, 0);
@@ -56,8 +56,83 @@ int draw_help(WINDOW *win) {
 
 	do { rc = getch(); }
 		while (rc < 7 && 128 > rc); // press any key
+}
 
-	return rc;
+void draw_errwin(WINDOW *win, char *caption, int error) {
+	int rc;
+
+	wbkgd(win, COLOR_PAIR(4));
+	box(win, 0, 0);
+	mvwhline(win, 1, 2, ' ', 50);
+	mvwprintw(win, 1, POPUP_SIZE/2-strlen(caption)/2, "%s", caption);
+	mvwhline(win, 2, 1, 0, 52);
+	mvwhline(win, 6, 2, ' ', 50);
+	mvwprintw(win, 6, POPUP_SIZE/2-11, "Press any key to exit.");
+	wattron(win, COLOR_PAIR(5));
+	mvwhline(win, 4, 2, ' ', 50);
+	mvwprintw(win, 4, 2, "%.50s", strerror(error));
+	wattroff(win, COLOR_PAIR(4));
+	wrefresh(win);
+
+	do { rc = getch(); }
+		while (rc < 7 && 128 > rc); // press any key
+}
+
+void draw_prgsbar(WINDOW *win, char *caption, char *src, char *dst, int percent) {
+	int i;
+
+	if (percent > 100) return;
+
+	wbkgd(win, COLOR_PAIR(2));
+	box(win, 0, 0);
+	mvwhline(win, 1, 2, ' ', 50);
+	mvwprintw(win, 1, POPUP_SIZE/2-strlen(caption)/2, "%s", caption);
+	mvwhline(win, 2, 1, 0, 52);
+	wattron(win, COLOR_PAIR(1));
+	mvwhline(win, 4, 2, ' ', 50);
+	mvwprintw(win, 4, 2, "%.50s", src);
+	wattroff(win, COLOR_PAIR(2));
+	mvwprintw(win, 5, 2, "to");
+	wattron(win, COLOR_PAIR(1));
+	mvwhline(win, 6, 2, ' ', 50);
+	mvwprintw(win, 6, 2, "%.50s", dst);
+	mvwhline(win, 8, 2, ' ', 50);
+
+	for (i = 0; i < percent/2; i++)
+		mvwprintw(win, 8, 2+i, "░");
+
+	wattroff(win, COLOR_PAIR(2));
+	wrefresh(win);
+}
+
+void draw_menubar(WINDOW *win, int size) {
+	const char* buttons[MENU_ITEMS] = { "Help", "", "View", "Edit", "Copy", "Move", "Folder+", "Delete", "", "Exit" };
+	int bs = size / MENU_ITEMS;
+	int br = size % MENU_ITEMS;
+	int i, pos;
+
+	wbkgd(win, COLOR_PAIR(2));
+	wclear(win);
+
+	for (pos = bs, i = 0; i < MENU_ITEMS; i++, pos += bs) {
+		wattron(win, COLOR_PAIR(3));
+		wprintw(win, "%2d", i+1);
+		wattroff(win, COLOR_PAIR(3));
+		waddstr(win, buttons[i]);
+		if (br) { pos++; br--; }
+		wmove(win, 0, pos);
+	}
+}
+
+void draw_statbar(WINDOW *win, const char *fmt, ...) {
+	va_list args;
+	va_start(args, fmt);
+
+	wbkgd(win, COLOR_PAIR(2));
+	wclear(win);
+	vwprintw(win, fmt, args);
+
+	va_end(args);
 }
 
 int draw_pmtwin(WINDOW *win, char *caption, char *str) {
@@ -82,7 +157,7 @@ int draw_pmtwin(WINDOW *win, char *caption, char *str) {
 
 	s = p = str;
 	getyx(win, y, x);
-	while (p - str < MAX_STR) {
+	while (p - str < PATH_MAX) {
 		rc = getchar();
 		if (rc == 13 || 27 == rc) break;
 		else if (rc == KEY_BACKSPACE || rc == 127) { // del
@@ -151,58 +226,6 @@ int draw_actwin2(WINDOW *win, char *caption, char *src, char *dst) {
 	return rc;
 }
 
-int draw_errwin(WINDOW *win, char *caption, int error) {
-	int rc = 0;
-
-	wbkgd(win, COLOR_PAIR(4));
-	box(win, 0, 0);
-	mvwhline(win, 1, 2, ' ', 50);
-	mvwprintw(win, 1, POPUP_SIZE/2-strlen(caption)/2, "%s", caption);
-	mvwhline(win, 2, 1, 0, 52);
-	mvwhline(win, 6, 2, ' ', 50);
-	mvwprintw(win, 6, POPUP_SIZE/2-11, "Press any key to exit.");
-	wattron(win, COLOR_PAIR(5));
-	mvwhline(win, 4, 2, ' ', 50);
-	mvwprintw(win, 4, 2, "%.50s", strerror(error));
-	wattroff(win, COLOR_PAIR(4));
-	wrefresh(win);
-
-	do { rc = getch(); }
-		while (rc < 7 && 128 > rc); // press any key
-
-	return rc;
-}
-
-void draw_menubar(WINDOW *win, int size) {
-	const char* buttons[MENU_ITEMS] = { "Help", "", "View", "Edit", "Copy", "Move", "Folder+", "Delete", "", "Exit" };
-	int bs = size / MENU_ITEMS;
-	int br = size % MENU_ITEMS;
-	int i, pos;
-
-	wbkgd(win, COLOR_PAIR(2));
-	wclear(win);
-
-	for (pos = bs, i = 0; i < MENU_ITEMS; i++, pos += bs) {
-		wattron(win, COLOR_PAIR(3));
-		wprintw(win, "%2d", i+1);
-		wattroff(win, COLOR_PAIR(3));
-		waddstr(win, buttons[i]);
-		if (br) { pos++; br--; }
-		wmove(win, 0, pos);
-	}
-}
-
-void draw_statbar(WINDOW *win, const char *fmt, ...) {
-	va_list args;
-	va_start(args, fmt);
-
-	wbkgd(win, COLOR_PAIR(2));
-	wclear(win);
-	vwprintw(win, fmt, args);
-
-	va_end(args);
-}
-
 int draw_execwin(WINDOW *win, char *path, int argc, ...) {
 	char buffer[PAGE_SIZE];
 	char *argv[EXEC_MAXARGS + 1];
@@ -211,12 +234,6 @@ int draw_execwin(WINDOW *win, char *path, int argc, ...) {
 	pid_t pid;
 	int fd[2];
 	int i, rc, size;
-
-/*
-	wbkgd(win, COLOR_PAIR(3));
-	keypad(win, true);
-	scrollok(win, true);
-*/
 
 	va_start(ap, argc);
 	waddch(win, '>');
@@ -256,4 +273,3 @@ int draw_execwin(WINDOW *win, char *path, int argc, ...) {
 
 	return 0;
 }
-

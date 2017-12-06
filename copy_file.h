@@ -15,21 +15,25 @@
 #define READ_TIMEOUT 60000
 #define WRITE_TIMEOUT 60000
 
-#ifndef PATH_MAX
-#define PATH_MAX 1024
-#endif
+typedef enum {
+	CP_MODE_COPY,
+	CP_MODE_MOVE,
+	CP_MODE_REMOVE
+} cp_flags;
 
 typedef struct {
 	WINDOW *stat;
-	const char *src;
-	const char *dst;
-	int move_flag;
-	int cp_top;
-	int cp_cur;
+	char *src;
+	char *dst;
+	mode_t mode;
+	size_t size;
+	size_t curpos;
+	int func;
 } cp_state;
 
 typedef void (*cp_callback)(cp_state *s);
 
-int copy_file(WINDOW *stat, const char *src, const char *dst, int move_flag, cp_callback cpcb);
+int copy_file(WINDOW *stat, char *src, char *dst, int func, cp_callback cpcb);
+int remove_file(WINDOW *stat, char *path, int func, cp_callback cpcb);
 
 #endif // _COPY_FILE_H

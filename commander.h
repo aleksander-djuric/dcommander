@@ -30,9 +30,12 @@
 
 #define MENU_ITEMS 10
 #define POPUP_SIZE 54
-#define MAX_STR 1024
 #define LOG_SIZE 32768
 #define EXEC_MAXARGS 10
+
+#ifndef PATH_MAX
+#define PATH_MAX 1024
+#endif
 
 typedef struct {
 	int start;
@@ -42,7 +45,7 @@ typedef struct {
 	int prev;
 	struct dirent **items;
 	int count;
-	char path[MAX_STR];
+	char path[PATH_MAX];
 } wstate;
 
 #endif // _COMMANDER_H

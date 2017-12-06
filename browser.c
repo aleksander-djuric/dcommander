@@ -14,7 +14,7 @@
 int wvprintw_m(WINDOW *win, int row, int maxcols, int attrs, char *path, char *name) {
 	struct stat st, lst;
 	struct tm *time;
-	char buffer[MAX_STR];
+	char buffer[PATH_MAX];
 	int ret;
 
 	if (stat(path, &st) < 0 || lstat(path, &lst) < 0) return -1;
@@ -39,7 +39,7 @@ int wvprintw_m(WINDOW *win, int row, int maxcols, int attrs, char *path, char *n
 }
 
 int browser(WINDOW *dir, wstate *s, int cmd, int active) {
-	char path[2*MAX_STR];
+	char path[2*PATH_MAX];
 	int i, y, cur, len, lines;
 
 	if (s->count < 0) return -1;
@@ -56,7 +56,7 @@ int browser(WINDOW *dir, wstate *s, int cmd, int active) {
 		if (i < (s->start + len)) {
 			wmove(dir, y, 1);
 			wclrtoeol(dir);
-			snprintf(path, 2*MAX_STR-1, "%s/%s", s->path, s->items[i]->d_name);
+			snprintf(path, 2*PATH_MAX-1, "%s/%s", s->path, s->items[i]->d_name);
 
 			if (s->start + cur == i && active)
 				wvprintw_m(dir, y, s->width, A_REVERSE, path, s->items[i]->d_name);
