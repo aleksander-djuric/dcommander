@@ -34,6 +34,5 @@ typedef struct {
 typedef void (*cp_callback)(cp_state *s);
 
 int copy_file(WINDOW *stat, char *src, char *dst, int func, cp_callback cpcb);
-int remove_file(WINDOW *stat, char *path, int func, cp_callback cpcb);
 
 #endif // _COPY_FILE_H

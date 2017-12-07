@@ -165,7 +165,7 @@ int main() {
 				p = dirstate[active].items[dirstate[active].choice]->d_name;
 				snprintf(dstbuf, PATH_MAX-1, "%s/%s", dirstate[active].path, p);
 
-				if (remove_file(actwin2, dstbuf, CP_MODE_REMOVE, cpcb_ptr) < 0)
+				if (copy_file(actwin2, dstbuf, NULL, CP_MODE_REMOVE, cpcb_ptr) < 0)
 					draw_errwin(actwin1, "Delete error", errno);
 				else if (dirstate[active].choice > 0) dirstate[active].choice--;
 			}
@@ -188,29 +188,27 @@ int main() {
 			snprintf(dstbuf, PATH_MAX-1, "%s/%s", dirstate[active].path, p);
 			if (stat(dstbuf, &st) < 0) break;
 
-			if (S_ISDIR(st.st_mode) && chdir(dstbuf) == 0) {
-				if (getcwd(dirstate[active].path, PATH_MAX-1) == NULL)
-					strncpy(dirstate[active].path, dstbuf, PATH_MAX-1);
-				dirstate[active].count = scandir(dirstate[active].path, &(dirstate[active].items), dot_filter, alphasort);
+			if (S_ISDIR(st.st_mode)) {
+				if (chdir(dstbuf) == 0) {
+					if (getcwd(dirstate[active].path, PATH_MAX-1) == NULL)
+						strncpy(dirstate[active].path, dstbuf, PATH_MAX-1);
+					dirstate[active].count = scandir(dirstate[active].path, &(dirstate[active].items), dot_filter, alphasort);
 
-				if (*p == '.' && *(p + 1) == '.') {
-					dirstate[active].choice = dirstate[active].prev;
-					dirstate[active].prev = 0;
-				} else if (lstat(dstbuf, &st) == 0 && S_ISLNK(st.st_mode)) {
-					dirstate[active].prev = 0;
-					dirstate[active].choice = 0;
-				} else {
-					dirstate[active].prev = dirstate[active].choice;
-					dirstate[active].choice = 0;
-				}
+					if (*p == '.' && *(p + 1) == '.') {
+						dirstate[active].choice = dirstate[active].prev;
+						dirstate[active].prev = 0;
+					} else if (lstat(dstbuf, &st) == 0 && S_ISLNK(st.st_mode)) {
+						dirstate[active].prev = 0;
+						dirstate[active].choice = 0;
+					} else {
+						dirstate[active].prev = dirstate[active].choice;
+						dirstate[active].choice = 0;
+					}
+				} else draw_errwin(actwin1, "Error changing folder", errno);
 			} else if (st.st_mode & S_IXUSR) {
 				if (draw_execwin(execw, dstbuf, 1, p) < 0)
 					draw_errwin(actwin1, "Exec error", errno);
 			}
-
-			draw_statbar(status, "%s", dirstate[active].path);
-			wrefresh(status);
-
 			updtflag = 2;
 			break;
 		case KEY_RESIZE:
@@ -240,14 +238,12 @@ int main() {
 			wrefresh(status);
 			wrefresh(menu);
 			updtflag = 2;
-
 			break;
 		case CTRL('o'):
 			redrawwin(execw);
 			wrefresh(execw);
 			while (getch() != CTRL('o'));
 			updtflag = 2;
-
 			break;
 		default:
 			updtflag = 1;

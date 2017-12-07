@@ -58,95 +58,6 @@ int copy_data(int fdin, int fdout, void *buffer, size_t buffer_size, cp_callback
 	return 0;
 }
 
-int copy_file(WINDOW *win, char *src, char *dst, int func, cp_callback cb_func) {
-	char src_path[PATH_MAX];
-	char dst_path[PATH_MAX];
-	cp_state cps;
-	struct stat ss, ds;
-	void *buffer = NULL;
-	char *p;
-	size_t buffer_size;
-	int fdin, fdout, rc;
-
-	if (*src == '\0' || *dst == '\0') return 0;
-
-	stat(src, &ss);
-	cps.stat = win;
-	cps.src = src;
-	cps.dst = dst_path;
-	cps.mode = ss.st_mode;
-	cps.size = ss.st_size;
-	cps.curpos = 0;
-	cps.func = func;
-
-	// get source file name
-	p = src + strlen(src) - 1;
-	while (p > src && *p == '/') p--;
-	if ((p = strrchr(src, '/')) == 0) p = src;
-		else p++;
-
-	// build destination path
-	if (stat(dst, &ds) == 0 && S_ISDIR(ds.st_mode))
-		snprintf(dst_path, PATH_MAX, "%s/%s", dst, p);
-	else strncpy(dst_path, dst, PATH_MAX-1);
-
-	if (S_ISDIR(ss.st_mode)) {
-		DIR *dir;
-
-		if (mkdir(dst_path, cps.mode) < 0 && errno != EEXIST) return -1;
-		if ((dir = opendir(src))) {
-			struct dirent *d;
-
-			while ((d = readdir(dir))) {
-				if (d->d_name[0] == '.' &&
-				(d->d_name[1] == '\0' || d->d_name[1] == '.')) continue;
-
-				snprintf(src_path, PATH_MAX, "%s/%s", src, d->d_name);
-				if (copy_file(win, src_path, dst_path, func, cb_func) < 0)
-					return -1;
-			}
-		}
-		closedir(dir);
-		if (func == CP_MODE_MOVE) {
-			rc = rmdir(src);
-			cps.curpos = cps.size + 1;
-			if (cb_func) cb_func(&cps);
-			return rc;
-		}
-
-		return 0;
-	}
-
-	if (cb_func) cb_func(&cps);
-	if (func == CP_MODE_MOVE) {
-		rc = rename(src, dst_path);
-		if (rc < 0 && errno != EXDEV) return rc;
-		cps.curpos = cps.size + 1;
-		if (cb_func) cb_func(&cps);
-		return 0;
-	}
-
-	buffer_size = getpagesize();
-	if (!(buffer = malloc(buffer_size))) return -1;
-
-	if ((fdin = open(src, O_RDONLY)) < 0) return -1;
-	if ((fdout = open(dst_path, O_WRONLY|O_CREAT|O_TRUNC, cps.mode & 0xfff)) < 0) {
-		close(fdin);
-		return -1;
-	}
-
-	rc = copy_data(fdin, fdout, buffer, buffer_size, cb_func, &cps);
-	if (buffer) free(buffer);
-
-	close(fdin);
-	close(fdout);
-
-	if (rc == 0 && func == CP_MODE_MOVE)
-		return unlink(src);
-
-	return rc;
-}
-
 int remove_file(WINDOW *win, char *path, int func, cp_callback cb_func) {
 	char fname[PATH_MAX];
 	cp_state cps;
@@ -175,8 +86,8 @@ int remove_file(WINDOW *win, char *path, int func, cp_callback cb_func) {
 				(d->d_name[1] == '\0' || d->d_name[1] == '.')) continue;
 
 				snprintf(fname, PATH_MAX, "%s/%s", path, d->d_name);
-				if (remove_file(win, fname, func, cb_func) < 0)
-					return -1;
+				if ((rc = remove_file(win, fname, func, cb_func)) < 0)
+					return rc;
 			}
 		}
 		closedir(dir);
@@ -188,11 +99,99 @@ int remove_file(WINDOW *win, char *path, int func, cp_callback cb_func) {
 		return rc;
 	}
 
-	if (cb_func) cb_func(&cps);
 	if ((rc = unlink(path)) == 0) {
 		cps.curpos = cps.size + 1;
 		if (cb_func) cb_func(&cps);
 	}
+
+	return rc;
+}
+
+int copy_file(WINDOW *win, char *src, char *dst, int func, cp_callback cb_func) {
+	char src_path[PATH_MAX];
+	char dst_path[PATH_MAX];
+	cp_state cps;
+	struct stat ss, ds;
+	void *buffer = NULL;
+	char *p;
+	size_t buffer_size;
+	int fdin, fdout, rc;
+
+	if (dst == NULL && func == CP_MODE_REMOVE)
+		return remove_file(win, src, func, cb_func);
+	if (*src == '\0' || *dst == '\0') return 0;
+
+	// get source file name
+	p = src + strlen(src) - 1;
+	while (p > src && *p == '/') p--;
+	if ((p = strrchr(src, '/')) == 0) p = src;
+		else p++;
+
+	// build destination path
+	if (stat(dst, &ds) == 0 && S_ISDIR(ds.st_mode))
+		snprintf(dst_path, PATH_MAX, "%s/%s", dst, p);
+	else strncpy(dst_path, dst, PATH_MAX-1);
+
+	stat(src, &ss);
+	cps.stat = win;
+	cps.src = src;
+	cps.dst = dst_path;
+	cps.mode = ss.st_mode;
+	cps.size = ss.st_size;
+	cps.curpos = 0;
+	cps.func = func;
+
+	if (S_ISDIR(ss.st_mode)) {
+		DIR *dir;
+
+		if ((rc = mkdir(dst_path, cps.mode)) < 0 && errno != EEXIST) return rc;
+		if ((dir = opendir(src))) {
+			struct dirent *d;
+
+			while ((d = readdir(dir))) {
+				if (d->d_name[0] == '.' &&
+				(d->d_name[1] == '\0' || d->d_name[1] == '.')) continue;
+
+				snprintf(src_path, PATH_MAX, "%s/%s", src, d->d_name);
+				if ((rc = copy_file(win, src_path, dst_path, func, cb_func)) < 0)
+					return rc;
+			}
+		}
+		closedir(dir);
+
+		cps.curpos = cps.size + 1;
+		if (cb_func) cb_func(&cps);
+		if (func == CP_MODE_MOVE)
+			rc = rmdir(src);
+
+		return rc;
+	}
+
+	if (func == CP_MODE_MOVE) {
+		if ((rc = rename(src, dst_path)) == 0) {
+			cps.curpos = cps.size + 1;
+			if (cb_func) cb_func(&cps);
+			return 0;
+		} else if (errno != EXDEV) return rc;
+	}
+
+	if ((fdin = open(src, O_RDONLY)) < 0) return -1;
+	if ((fdout = open(dst_path, O_WRONLY|O_CREAT|O_TRUNC, cps.mode & 0xfff)) < 0) {
+		close(fdin);
+		return -1;
+	}
+
+	buffer_size = getpagesize();
+	if (!(buffer = malloc(buffer_size))) return -1;
+
+	rc = copy_data(fdin, fdout, buffer, buffer_size, cb_func, &cps);
+	if (buffer) free(buffer);
+
+	close(fdin);
+	close(fdout);
+
+	if (rc == 0 && func == CP_MODE_MOVE)
+		return unlink(src);
 
 	return rc;
 }
